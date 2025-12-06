@@ -1,0 +1,48 @@
+# VS/Visual Studio files
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+Debug/
+Release/
+x64/
+x86/
+*.exe
+*.ilk
+*.pdb
+*.obj
+*.lib
+*.dll
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# IDE
+*.suo
+*.user
+*.ncb
+*.aps
+*.cache
+*.sdf
+*.opensdf
+
+# System
+.DS_Store
+Thumbs.db
+
+# GDAL
+*.tif
+*.tiff
+*.geotiff
+
+# Compiled binaries
+bin/
+obj/
+
+# Dependencies
+dependencies/
+libs/
