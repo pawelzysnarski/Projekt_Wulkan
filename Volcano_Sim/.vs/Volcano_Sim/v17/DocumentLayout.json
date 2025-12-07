@@ -32,7 +32,7 @@
               "RelativeDocumentMoniker": "Volcano_Sim\\main.cpp",
               "ToolTip": "C:\\Users\\wojci\\Desktop\\QT files\\Projekt_Wulkan\\Volcano_Sim\\Volcano_Sim\\main.cpp",
               "RelativeToolTip": "Volcano_Sim\\main.cpp",
-              "ViewState": "AgIAADIBAAAAAAAAAAAewDoBAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAB4BAAAAAAAAAAAuwDoBAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
               "WhenOpened": "2025-12-07T13:31:48.236Z",
               "EditorCaption": ""
@@ -47,8 +47,7 @@
               "RelativeToolTip": "include\\cloud.h",
               "ViewState": "AgIAAAcAAAAAAAAAAAAuwBUAAAArAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
-              "WhenOpened": "2025-12-07T11:41:03.975Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-12-07T11:41:03.975Z"
             },
             {
               "$type": "Document",
@@ -60,8 +59,7 @@
               "RelativeToolTip": "src\\cloud.cpp",
               "ViewState": "AgIAAHsAAAAAAAAAAAAuwIgAAAAfAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
-              "WhenOpened": "2025-12-07T11:28:10.015Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-12-07T11:28:10.015Z"
             }
           ]
         }
