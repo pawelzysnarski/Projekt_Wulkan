@@ -30,7 +30,7 @@ void Cloud::generateParticles(size_t N,
     int choice)
 {
     uniform_real_distribution<double> ang(0.0, 2.0 * M_PI);
-    uniform_real_distribution<double> ang2(0.0, 0.15 * M_PI);
+    uniform_real_distribution<double> ang2(0.0, 0.1 * M_PI);
     uniform_real_distribution<double> r01(0.0, 1.0);
     uniform_real_distribution<double> spd(min_speed, max_speed);
     uniform_real_distribution<double> diam(min_diameter, max_diameter);
@@ -74,10 +74,9 @@ void Cloud::generateParticles(size_t N,
         particles.push_back(m);
     }
 }
-
 void Cloud::update(double dt, double airDensity,
     double wind_u, double wind_v,
-    vector<Materia>& vec,
+    vector<Materia>& vec, vector<Materia>& vec2,
     const DEMLoader& dem, double wind_w,
     double turbulence) {
     uniform_real_distribution<double> turb(-1.0, 1.0);
@@ -135,8 +134,11 @@ void Cloud::update(double dt, double airDensity,
                 vec.push_back(p);
                 return true;
             }
+            if (p.position_z >= 100000) {
+                vec2.push_back(p);
+                return true;
+            }
             return false;
         });
-
     this->particles.erase(it, this->particles.end());
 }

@@ -1,9 +1,5 @@
-﻿  cloud.cpp
-  formulas.cpp
-  weather.cpp
-  main.cpp
-C:\Users\Staszek\OneDrive\Pulpit\Projekt_Wulkan-main\Volcano_Sim\Volcano_Sim\main.cpp(24,15): warning C4244: "argument": konwersja z "time_t" do "unsigned int", możliwa utrata danych
-  Generowanie kodu...
-  Volcano_Sim.vcxproj -> C:\Users\Staszek\OneDrive\Pulpit\Projekt_Wulkan-main\Volcano_Sim\x64\Debug\Volcano_Sim.exe
+﻿  main.cpp
+C:\Users\wojci\Desktop\QT files\Projekt_Wulkan\Volcano_Sim\Volcano_Sim\main.cpp(24,15): warning C4244: "argument": konwersja z "time_t" do "unsigned int", możliwa utrata danych
+  Volcano_Sim.vcxproj -> C:\Users\wojci\Desktop\QT files\Projekt_Wulkan\Volcano_Sim\x64\Debug\Volcano_Sim.exe
   'pwsh.exe' is not recognized as an internal or external command,
   operable program or batch file.

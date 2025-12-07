@@ -25,9 +25,8 @@ public:
 
     void update(double dt, double airDensity,
         double wind_u, double wind_v,
-        std::vector<Materia>& particlesOnEart,
+		std::vector<Materia>& particlesOnEart, std::vector<Materia>& particlesOverflow,
         const DEMLoader& dem,
         double wind_w = 0.0, double turbulence = 0.0);
-
     void clear() { particles.clear(); }
 };

@@ -151,17 +151,13 @@ int main() {
     cout << "  Wilgotnosc: " << weatherSystem.humidity << "%\n";
     cout << "  Gestosc powietrza: " << weatherSystem.CalculateAirDensity() << " kg/m3\n";
 
-    int particleCount = 1000;
+    int particleCount = (int)rand() % 2000 + 5000;
+    int particlesPerFrame;
+    int holdParticlesCount=0;
     Cloud* cloud = new Cloud(&weatherSystem);
-
-    cloud->generateParticles(particleCount,
-        craterX, craterY, craterZ,
-        30.0,
-        50.0, 100.0,
-        0.0005, 0.002,
-        6);
-
+	bool isActive = true;
     vector<Materia> particlesOnEarth;
+	vector<Materia> particlesOverflow;
 
     cout << "\nSymulacja rozpoczyna sie. Nacisnij ESC aby zakonczyc.\n";
     cout << "Liczba czastek: " << particleCount << "\n";
@@ -196,7 +192,7 @@ int main() {
 
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
-        glOrtho(vx0, vx1, vy0, vy1, -1000.0, 1000.0);
+        glOrtho(vx0, vx1, vy0, vy1, -1000, 1000);
 
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
@@ -222,7 +218,7 @@ int main() {
         glColor3f(1.0f, 0.0f, 0.0f);
         glVertex3d(craterX, craterY, 10.0);
         glEnd();
-
+        glDisable(GL_DEPTH_TEST);
         for (int i = 0; i < particlesOnEarth.size(); i++) {
             Materia& p = particlesOnEarth[i];
             glPointSize(4.0f);
@@ -231,10 +227,28 @@ int main() {
             glVertex3d(p.position_x, p.position_y, p.position_z);
             glEnd();
         }
+        if (isActive) {
 
+            particlesPerFrame = (int)rand() % 30 + 1;
+            int particlesToAdd = min(particlesPerFrame, particleCount - holdParticlesCount);
+            if (particlesToAdd > 0) {
+                cloud->generateParticles(particlesToAdd,
+                    craterX, craterY, craterZ,
+                    30.0,
+                    150.0, 200.0,
+                    0.0005, 0.002,
+                    (int)floor(rand() % 10));
+
+                holdParticlesCount += particlesToAdd;
+            }
+            else {
+                isActive = false;
+            }
+
+        }
         for (int i = 0; i < cloud->particles.size(); i++) {
             Materia& p = cloud->particles[i];
-            glPointSize((GLfloat)(p.diameter * 1000.0));
+            glPointSize((GLfloat)(p.diameter * 2000.0));
             glBegin(GL_POINTS);
             float heightFactor = min(1.0f, max(0.0f, (float)(p.position_z - craterZ + 500.0f) / 1000.0f));
             glColor3f(0.2f + heightFactor * 0.3f,
@@ -243,29 +257,26 @@ int main() {
             glVertex3d(p.position_x, p.position_y, p.position_z);
             glEnd();
         }
-
+        glEnable(GL_DEPTH_TEST);
         double wind_u, wind_v;
         weatherSystem.GetWindVector(wind_u, wind_v);
 
         cloud->update(0.05, weatherSystem.CalculateAirDensity(),
             wind_u, wind_v,
-            particlesOnEarth, dem,
+            particlesOnEarth,particlesOverflow, dem,
             0.0, weatherSystem.turbulence * 0.5);
-
-        if (cloud->particles.size() > 0) {
+        if (cloud->particles.size() > 0||holdParticlesCount==particleCount) {
             double avgHeight = 0;
             double minHeight = 1e9, maxHeight = -1e9;
             int validCount = 0;
-
             for (auto& p : cloud->particles) {
-                if (!isnan(p.position_z) && p.position_z > -1000 && p.position_z < 100000) {
+                if (!isnan(p.position_z) && p.position_z > 0 && p.position_z < 100000) {
                     avgHeight += p.position_z;
                     if (p.position_z < minHeight) minHeight = p.position_z;
                     if (p.position_z > maxHeight) maxHeight = p.position_z;
                     validCount++;
                 }
             }
-
             if (validCount > 0) {
                 avgHeight /= validCount;
 
@@ -279,6 +290,13 @@ int main() {
                 static int frameCounter = 0;
                 if (frameCounter % 50 == 0) {
                     cout << "Frame " << frameCounter << ": ";
+                    if (isActive) {
+						cout << "Wulkan aktywny. Nowych czastek: "<<particlesPerFrame<< "\n";
+                        cout << "W powietrzu: " << cloud->particles.size()
+                            << ", Na ziemi: " << particlesOnEarth.size()
+                            << ", W kosmosie: " << particlesOverflow.size()
+                            << "/" << particleCount << endl;
+                    }
                     cout << "Czastek: " << cloud->particles.size() << "/" << particleCount;
                     cout << ", Wysokosc: " << avgHeight << "m";
                     cout << ", Wiatr: (" << fixed << setprecision(2) << wind_u
@@ -292,8 +310,7 @@ int main() {
 
         glfwSwapBuffers(window);
         glfwPollEvents();
-
-        Wait(50);
+        Wait(0);
     }
 
     if (texId) glDeleteTextures(1, &texId);
@@ -304,6 +321,6 @@ int main() {
 
     cout << "\nSymulacja zakonczona.\n";
     cout << "Liczba czastek, ktore spadly na ziemie: " << particlesOnEarth.size() << "\n";
-
+	cout << "Liczba czastek, ktore opuscily atmosfere: " << particlesOverflow.size() << "\n";
     return 0;
 }

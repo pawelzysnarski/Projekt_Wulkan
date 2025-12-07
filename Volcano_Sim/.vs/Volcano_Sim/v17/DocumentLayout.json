@@ -1,0 +1,71 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\wojci\\Desktop\\QT files\\Projekt_Wulkan\\Volcano_Sim\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{C18B19BC-CCB6-4F49-A0EE-A758DC373AEA}|Volcano_Sim\\Volcano_Sim.vcxproj|C:\\Users\\wojci\\Desktop\\QT files\\Projekt_Wulkan\\Volcano_Sim\\Volcano_Sim\\main.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{C18B19BC-CCB6-4F49-A0EE-A758DC373AEA}|Volcano_Sim\\Volcano_Sim.vcxproj|solutionrelative:Volcano_Sim\\main.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{C18B19BC-CCB6-4F49-A0EE-A758DC373AEA}|Volcano_Sim\\Volcano_Sim.vcxproj|C:\\Users\\wojci\\Desktop\\QT files\\Projekt_Wulkan\\Volcano_Sim\\include\\cloud.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{C18B19BC-CCB6-4F49-A0EE-A758DC373AEA}|Volcano_Sim\\Volcano_Sim.vcxproj|solutionrelative:include\\cloud.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{C18B19BC-CCB6-4F49-A0EE-A758DC373AEA}|Volcano_Sim\\Volcano_Sim.vcxproj|C:\\Users\\wojci\\Desktop\\QT files\\Projekt_Wulkan\\Volcano_Sim\\src\\cloud.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{C18B19BC-CCB6-4F49-A0EE-A758DC373AEA}|Volcano_Sim\\Volcano_Sim.vcxproj|solutionrelative:src\\cloud.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "main.cpp",
+              "DocumentMoniker": "C:\\Users\\wojci\\Desktop\\QT files\\Projekt_Wulkan\\Volcano_Sim\\Volcano_Sim\\main.cpp",
+              "RelativeDocumentMoniker": "Volcano_Sim\\main.cpp",
+              "ToolTip": "C:\\Users\\wojci\\Desktop\\QT files\\Projekt_Wulkan\\Volcano_Sim\\Volcano_Sim\\main.cpp",
+              "RelativeToolTip": "Volcano_Sim\\main.cpp",
+              "ViewState": "AgIAADIBAAAAAAAAAAAewDoBAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2025-12-07T13:31:48.236Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "cloud.h",
+              "DocumentMoniker": "C:\\Users\\wojci\\Desktop\\QT files\\Projekt_Wulkan\\Volcano_Sim\\include\\cloud.h",
+              "RelativeDocumentMoniker": "include\\cloud.h",
+              "ToolTip": "C:\\Users\\wojci\\Desktop\\QT files\\Projekt_Wulkan\\Volcano_Sim\\include\\cloud.h",
+              "RelativeToolTip": "include\\cloud.h",
+              "ViewState": "AgIAAAcAAAAAAAAAAAAuwBUAAAArAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2025-12-07T11:41:03.975Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "cloud.cpp",
+              "DocumentMoniker": "C:\\Users\\wojci\\Desktop\\QT files\\Projekt_Wulkan\\Volcano_Sim\\src\\cloud.cpp",
+              "RelativeDocumentMoniker": "src\\cloud.cpp",
+              "ToolTip": "C:\\Users\\wojci\\Desktop\\QT files\\Projekt_Wulkan\\Volcano_Sim\\src\\cloud.cpp",
+              "RelativeToolTip": "src\\cloud.cpp",
+              "ViewState": "AgIAAHsAAAAAAAAAAAAuwIgAAAAfAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
+              "WhenOpened": "2025-12-07T11:28:10.015Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
