@@ -1,0 +1,6 @@
+# Visual Studio / IntelliSense
+ipch/
+.vs/
+*.suo
+*.user
+*.VC.db
