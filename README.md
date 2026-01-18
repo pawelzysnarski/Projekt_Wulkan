@@ -39,8 +39,8 @@ Domyślne dane znajdują się w katalogu `Volcano_Sim/geo`.
 
 ## Sterowanie
 - `ESC` – zakończenie symulacji.
-- `←` / `→` – obrót kamery wokół krateru.
-- `↑` / `↓` – wysokość kamery nad kraterem.
+- `Left Arrow` / `Right Arrow` (← / →) – obrót kamery wokół krateru.
+- `Up Arrow` / `Down Arrow` (↑ / ↓) – wysokość kamery nad kraterem.
 - `Numpad +` / `Numpad -` – przybliżenie/oddalenie (promień orbity).
 - `Z` / `X` – zwiększanie/zmniejszanie skali wysokości terenu.
 
