@@ -1,6 +1,6 @@
 # Projekt Wulkan (Volcano Simulator)
 
-Projekt Wulkan to aplikacja C++/OpenGL symulująca erupcję wulkanu na podstawie danych wysokościowych (DEM) i profilu pogodowego. Program renderuje teren z pliku GeoTIFF, generuje cząstki wyrzutu i aktualizuje ich ruch z uwzględnieniem wiatru, turbulencji, gęstości powietrza oraz grawitacji.
+Projekt Wulkan to aplikacja C++/OpenGL symulująca erupcję wulkanu na podstawie danych wysokościowych (DEM) i profilu pogodowego. Program renderuje teren z pliku GeoTIFF oraz generuje cząstki wyrzutu. Ruch cząstek jest aktualizowany z uwzględnieniem wiatru, turbulencji, gęstości powietrza oraz grawitacji.
 
 ## Najważniejsze funkcje
 - Wczytywanie mapy wysokości (DEM) oraz tekstury z plików GeoTIFF.
