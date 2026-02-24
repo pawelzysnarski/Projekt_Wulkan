@@ -17,6 +17,11 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <streambuf>
+
+#ifndef GL_PROGRAM_POINT_SIZE
+#define GL_PROGRAM_POINT_SIZE 0x8642
+#endif
+
 using namespace std;
 
 struct NullBuffer : streambuf { int overflow(int c) override { return c; } };
@@ -26,7 +31,8 @@ int main() {
     srand((unsigned)time(NULL));
 
     float angle = 0.0f;
-    string demPath = "../geo/vesuvius_final.tiff";
+    string heightPath = "../geo/vesuvius_dem_height.tif";
+    string colorsPath = "../geo/vesuvius_dem_colors.tif";
     string weatherCSV = "../geo/open-meteo-40.81N14.44E1176m.csv";
     float orbitRadius = 8000.0f;
     Weather weatherSystem;
@@ -48,9 +54,15 @@ int main() {
     }
 
     DEMLoader dem;
-    if (!dem.load(demPath)) {
-        cerr << "Nie mozna wczytac DEM: " << demPath << "\n";
+
+    if (!dem.loadHeight(heightPath)) {
+        cerr << "Nie mozna wczytac pliku wysokosci: " << heightPath << "\n";
         return 1;
+    }
+
+    bool hasColors = dem.loadColors(colorsPath);
+    if (!hasColors) {
+        cout << "Ostrzezenie: Nie wczytano pliku z kolorami. Teren bedzie w skali szarosci.\n";
     }
 
     int nx = dem.width();
@@ -68,68 +80,92 @@ int main() {
     double minY = originY + ny * pxSizeY;
     double pxSizeY_abs = abs(pxSizeY);
 
-    GDALAllRegister();
-    GDALDataset* ds = (GDALDataset*)GDALOpen(demPath.c_str(), GA_ReadOnly);
-    if (!ds) { cerr << "Nie mozna otworzyc TIFF do RGB: " << demPath << "\n"; return 1; }
+    double terrainWidth = maxX - minX;
+    double terrainHeight = maxY - minY;
+    cout << "Rozmiar terenu: " << terrainWidth << " x " << terrainHeight << " m\n";
 
-    vector<unsigned char> tex((size_t)nx * (size_t)ny * 3, 0);
-    GDALRasterBand* b1 = ds->GetRasterBand(1);
-    GDALRasterBand* b2 = ds->GetRasterBand(2);
-    GDALRasterBand* b3 = ds->GetRasterBand(3);
-    if (b1 && b2 && b3) {
-        vector<unsigned char> r((size_t)nx * (size_t)ny),
-            g((size_t)nx * (size_t)ny),
-            b((size_t)nx * (size_t)ny);
-        b1->RasterIO(GF_Read, 0, 0, nx, ny, r.data(), nx, ny, GDT_Byte, 0, 0);
-        b2->RasterIO(GF_Read, 0, 0, nx, ny, g.data(), nx, ny, GDT_Byte, 0, 0);
-        b3->RasterIO(GF_Read, 0, 0, nx, ny, b.data(), nx, ny, GDT_Byte, 0, 0);
-        for (size_t i = 0; i < (size_t)nx * (size_t)ny; ++i) { tex[3 * i + 0] = r[i]; tex[3 * i + 1] = g[i]; tex[3 * i + 2] = b[i]; }
+    orbitRadius = terrainWidth * 0.8f;
+
+    double craterX = (minX + maxX) * 0.5;
+    double craterY = (minY + maxY) * 0.5;
+
+    cout << "Zakres X (metry UTM): " << minX << " - " << maxX << "\n";
+    cout << "Zakres Y (metry UTM): " << minY << " - " << maxY << "\n";
+    cout << "Krater X (metry): " << craterX << "\n";
+    cout << "Krater Y (metry): " << craterY << "\n";
+
+
+    vector<unsigned char> tex((size_t)nx * (size_t)ny * 4, 0);
+
+    if (dem.hasColors()) {
+        cout << "Tworzenie tekstury z kolorow...\n";
+        for (int y = 0; y < ny; ++y) {
+            for (int x = 0; x < nx; ++x) {
+                const DEMLoader::Color* col = dem.getColor(x, y);
+                if (col) {
+                    size_t idx = (size_t)(y * nx + x) * 4; 
+                    tex[idx] = col->r;
+                    tex[idx + 1] = col->g;
+                    tex[idx + 2] = col->b;
+                    tex[idx + 3] = 255;  
+                }
+            }
+        }
     }
     else {
-        vector<unsigned char> gray((size_t)nx * (size_t)ny);
-        GDALRasterBand* b = ds->GetRasterBand(1);
-        b->RasterIO(GF_Read, 0, 0, nx, ny, gray.data(), nx, ny, GDT_Byte, 0, 0);
-        for (size_t i = 0; i < (size_t)nx * (size_t)ny; ++i) { tex[3 * i + 0] = gray[i]; tex[3 * i + 1] = gray[i]; tex[3 * i + 2] = gray[i]; }
+        cout << "Brak kolorow - tworzenie tekstury w skali szarosci...\n";
+        auto [minH, maxH] = dem.getHeightRange();
+        double range = maxH - minH;
+        if (range <= 0) range = 1.0;
+
+        for (int y = 0; y < ny; ++y) {
+            for (int x = 0; x < nx; ++x) {
+                double gx = minX + x * pxSizeX;
+                double gy = minY + y * pxSizeY_abs;
+                double z = dem.getGroundZ(gx, gy);
+                unsigned char val = 0;
+                if (!isnan(z)) {
+                    val = (unsigned char)(((z - minH) / range) * 255.0);
+                }
+                size_t idx = (size_t)(y * nx + x) * 4; 
+                tex[idx] = val;
+                tex[idx + 1] = val;
+                tex[idx + 2] = val;
+                tex[idx + 3] = 255;
+            }
+        }
     }
-    GDALClose(ds);
 
     if (!glfwInit()) { cerr << "glfwInit failed\n"; return 1; }
 
-    int winW = nx, winH = ny;
+    int winW = 1200;
+    int winH = 800;
+
     GLFWmonitor* mon = glfwGetPrimaryMonitor();
     const GLFWvidmode* vm = glfwGetVideoMode(mon);
     int maxW = (int)(vm->width * 0.9);
     int maxH = (int)(vm->height * 0.9);
-    double scale = 1.0;
-    if (winW > maxW || winH > maxH) {
-        double sW = (double)maxW / (double)winW;
-        double sH = (double)maxH / (double)winH;
-        scale = min(sW, sH);
-        winW = (int)floor(winW * scale);
-        winH = (int)floor(winH * scale);
-    }
+
+    if (winW > maxW) winW = maxW;
+    if (winH > maxH) winH = maxH;
 
     GLFWwindow* window = glfwCreateWindow(winW, winH, "Eruption Simulator - Dynamic Weather System", nullptr, nullptr);
     if (!window) { cerr << "glfwCreateWindow failed\n"; glfwTerminate(); return 1; }
     glfwMakeContextCurrent(window);
     glfwSetInputMode(window, GLFW_STICKY_KEYS, GLFW_TRUE);
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_PROGRAM_POINT_SIZE);
 
     GLuint texId = 0;
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glGenTextures(1, &texId);
     glBindTexture(GL_TEXTURE_2D, texId);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, nx, ny, 0, GL_RGB, GL_UNSIGNED_BYTE, tex.data());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, nx, ny, 0, GL_RGBA, GL_UNSIGNED_BYTE, tex.data());
     glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-
-    double centerX = (minX + maxX) * 0.5;
-    double centerY = (minY + maxY) * 0.5;
-    double craterX = centerX;
-    double craterY = centerY;
 
     double minElev = 1e15, maxElev = -1e15;
     for (int y = 0; y < ny; ++y) {
@@ -141,12 +177,15 @@ int main() {
         }
     }
     double craterZRaw = dem.getGroundZ(craterX, craterY);
+    if (isnan(craterZRaw)) craterZRaw = (minElev + maxElev) * 0.5;
 
-    double zScale = 15.0;
-    double baseZ = craterZRaw;
+    cout << "Zakres wysokosci: " << minElev << " - " << maxElev << " m\n";
+    cout << "Wysokosc krateru: " << craterZRaw << " m\n";
+
+    double zScale = 10.0;
+    double baseZ = minElev;
 
     float camHeightOverCrater = 4000.0f;
-    float camZ = (float)((craterZRaw - baseZ) * zScale + camHeightOverCrater);
 
     weatherSystem.updateForAltitude(craterZRaw);
     cout << "Warunki poczatkowe w kraterze (wysokosc " << craterZRaw << " m):\n";
@@ -157,7 +196,7 @@ int main() {
     cout << "  Wilgotnosc: " << weatherSystem.humidity << "%\n";
     cout << "  Gestosc powietrza: " << weatherSystem.CalculateAirDensity() << " kg/m3\n";
 
-    int particleCount = (int)rand() % 1000 + 2000;
+    int particleCount = rand() % 1000 + 2000;
     int particlesPerFrame;
     int holdParticlesCount = 0;
     Cloud* cloud = new Cloud(&weatherSystem);
@@ -174,8 +213,10 @@ int main() {
     glEnable(GL_NORMALIZE);
     GLfloat lightDiffuse[4] = { 0.9f, 0.9f, 0.9f, 1.0f };
     GLfloat lightAmbient[4] = { 0.25f, 0.25f, 0.25f, 1.0f };
+    GLfloat lightPosition[4] = { (GLfloat)craterX, (GLfloat)craterY, (GLfloat)(craterZRaw + 5000.0f), 1.0f };
     glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
     glLightfv(GL_LIGHT0, GL_AMBIENT, lightAmbient);
+    glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
     glShadeModel(GL_SMOOTH);
 
     static int frameCounter = 0;
@@ -197,7 +238,7 @@ int main() {
 
         float fovY = glm::radians(55.0f);
         float zNear = 5.0f;
-        float zFar = 2000000.0f;
+        float zFar = 500000.0f;
 
         glMatrixMode(GL_PROJECTION); glLoadIdentity();
         glm::mat4 proj = glm::perspective(fovY, aspect, zNear, zFar);
@@ -206,6 +247,8 @@ int main() {
 
         double orbitX = cos(angle) * orbitRadius;
         double orbitY = sin(angle) * orbitRadius;
+
+        float camZ = (float)((craterZRaw - baseZ) * zScale + camHeightOverCrater);
 
         glm::vec3 eye((float)(craterX + orbitX), (float)(craterY + orbitY), camZ);
         glm::vec3 target((float)craterX, (float)craterY, (float)((craterZRaw - baseZ) * zScale));
@@ -236,6 +279,11 @@ int main() {
                 double z11r = dem.getGroundZ(x1, y1);
                 double z01r = dem.getGroundZ(x0, y1);
 
+                if (isnan(z00r)) z00r = minElev;
+                if (isnan(z10r)) z10r = minElev;
+                if (isnan(z11r)) z11r = minElev;
+                if (isnan(z01r)) z01r = minElev;
+
                 double z00 = (z00r - baseZ) * zScale;
                 double z10 = (z10r - baseZ) * zScale;
                 double z11 = (z11r - baseZ) * zScale;
@@ -243,12 +291,13 @@ int main() {
 
                 float u0 = (float)x / (float)(nx - 1);
                 float u1 = (float)(x + 1) / (float)(nx - 1);
-                float v0 = (float)y / (float)(ny - 1);
-                float v1 = (float)(y + 1) / (float)(ny - 1);
+                float v0 = 1.0f - (float)y / (float)(ny - 1);
+                float v1 = 1.0f - (float)(y + 1) / (float)(ny - 1);
 
                 glm::vec3 v00((float)x0, (float)y0, (float)z00);
                 glm::vec3 v10((float)x1, (float)y0, (float)z10);
                 glm::vec3 v01((float)x0, (float)y1, (float)z01);
+
                 glm::vec3 n = glm::normalize(glm::cross(v10 - v00, v01 - v00));
 
                 glBegin(GL_QUADS);
@@ -272,9 +321,8 @@ int main() {
         glEnd();
         glEnable(GL_LIGHTING);
 
-        for (int i = 0; i < (int)particlesOnEarth.size(); i++) {
-            Materia& p = particlesOnEarth[i];
-            glPointSize((GLfloat)(p.diameter * 4000.0));
+        for (const auto& p : particlesOnEarth) {
+            glPointSize(4.0f);
             glBegin(GL_POINTS);
             glColor3f(0.0f, 0.0f, 0.0f);
             float pz = (float)((p.position_z - baseZ) * zScale);
@@ -283,22 +331,21 @@ int main() {
         }
 
         if (isActive) {
-            particlesPerFrame = (int)rand() % 30 + 10;
+            particlesPerFrame = rand() % 30 + 10;
             int particlesToAdd = min(particlesPerFrame, particleCount - holdParticlesCount);
             if (particlesToAdd > 0) {
-                cloud->generateParticles(particlesToAdd, craterX, craterY, craterZRaw, 30.0, 40.0, 80.0, 0.0005, 0.002, (int)floor(rand() % 10));
+                cloud->generateParticles(particlesToAdd, craterX, craterY, craterZRaw, 30.0, 40.0, 80.0, 0.0005, 0.002, rand() % 10);
                 holdParticlesCount += particlesToAdd;
             }
             else { isActive = false; }
         }
 
-        for (int i = 0; i < (int)cloud->particles.size(); i++) {
-            Materia& p = cloud->particles[i];
+        for (const auto& p : cloud->particles) {
             glDisable(GL_LIGHTING);
-            glPointSize((GLfloat)(p.diameter * 4000.0));
+            glPointSize(3.0f);
             glBegin(GL_POINTS);
             float heightFactor = (float)min(1.0, max(0.0, (p.position_z - craterZRaw + 500.0) / 1000.0));
-            glColor3f(0.2f + heightFactor * 0.3f, 0.2f + heightFactor * 0.3f, 0.2f + heightFactor * 0.3f);
+            glColor3f(0.2f + heightFactor * 0.8f, 0.2f + heightFactor * 0.8f, 0.2f + heightFactor * 0.8f);
             float pz = (float)((p.position_z - baseZ) * zScale);
             glVertex3f((float)p.position_x, (float)p.position_y, pz);
             glEnd();
@@ -307,7 +354,7 @@ int main() {
 
         double wind_u, wind_v;
         weatherSystem.GetWindVector(wind_u, wind_v);
-        double updraft = max(0.0, (weatherSystem.temperature - 15.0) * 0.2)*100;
+        double updraft = max(0.0, (weatherSystem.temperature - 15.0) * 0.2) * 100;
         cloud->update(0.05, weatherSystem.CalculateAirDensity(), wind_u, wind_v, particlesOnEarth, particlesOverflow, dem, updraft, weatherSystem.turbulence * 0.5);
 
         for (auto it = particlesOnEarth.begin(); it != particlesOnEarth.end();) {
@@ -330,7 +377,6 @@ int main() {
             cout << "W powietrzu: " << cloud->particles.size()
                 << ", Na ziemi: " << particlesOnEarth.size()
                 << ", Poza atmosfera: " << particlesOverflow.size()
-                << ", Pozna obszarem: " << holdParticlesCount - particlesOnEarth.size() - cloud->particles.size()-particlesOverflow.size()
                 << ", Ogolem: " << particleCount << endl;
             double avgHeight = 0, minHeight = 1e9, maxHeight = -1e9; int validCount = 0;
             for (auto& p : cloud->particles) {
@@ -339,21 +385,52 @@ int main() {
                 }
             }
             if (validCount > 0) { avgHeight /= validCount; }
-            cout << "Czastek: " << cloud->particles.size() << "/" << particleCount
-                << ", Wysokosc: " << avgHeight << "m"
+            cout << "Czastek w chmurze: " << cloud->particles.size()
+                << ", Srednia wysokosc: " << avgHeight << "m"
                 << ", Wiatr: (" << fixed << setprecision(2) << wind_u << ", " << wind_v << ") m/s"
                 << ", Temp: " << weatherSystem.temperature << "°C" << endl;
         }
         frameCounter++;
 
-        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) camHeightOverCrater += 100.0f, camZ = (float)((craterZRaw - baseZ) * zScale + camHeightOverCrater);
-        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) camHeightOverCrater = max(500.0f, camHeightOverCrater - 100.0f), camZ = (float)((craterZRaw - baseZ) * zScale + camHeightOverCrater);
-        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) angle -= 0.01f;
-        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) angle += 0.01f;
-        if (glfwGetKey(window, GLFW_KEY_KP_ADD) == GLFW_PRESS) orbitRadius = max(2000.0f, orbitRadius - 100.0f);
-        if (glfwGetKey(window, GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS) orbitRadius += 100.0f;
-        if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS) zScale += 0.5;
-        if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS) zScale = max(1.0, zScale - 0.5);
+        // KAMERA - strzałki:
+// UP/DOWN   - zmiana wysokości kamery nad kraterem
+// LEFT/RIGHT - obrót wokół krateru 
+
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+            camHeightOverCrater += 500.0f;
+
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+            camHeightOverCrater = max(500.0f, camHeightOverCrater - 500.0f);
+
+        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+            angle -= 0.1f;  
+
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+            angle += 0.1f; 
+
+
+        // ODLEGŁOŚĆ OD KRATERU:
+        // KP_ADD / EQUAL   - przybliż (zmniejsz odległość)
+        // KP_SUBTRACT / MINUS - oddal (zwiększ odległość)
+
+        if (glfwGetKey(window, GLFW_KEY_KP_ADD) == GLFW_PRESS ||
+            glfwGetKey(window, GLFW_KEY_EQUAL) == GLFW_PRESS)
+            orbitRadius = max(2000.0f, orbitRadius - 500.0f);  
+
+        if(glfwGetKey(window, GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS ||
+            glfwGetKey(window, GLFW_KEY_MINUS) == GLFW_PRESS)
+            orbitRadius += 500.0f;  
+
+
+        // SKALA WYSOKOŚCI (jak bardzo góra jest "szpiczasta"):
+        // Z - zwiększ skalę (góra bardziej stroma)
+        // X - zmniejsz skalę (góra bardziej płaska)
+
+        if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS)
+            zScale += 0.5;  
+
+        if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
+            zScale = max(1.0, zScale - 0.5); 
 
         glfwSwapBuffers(window);
         Wait(100);
@@ -368,8 +445,8 @@ int main() {
     cout << "\nSymulacja zakonczona.\n";
     cout << "Liczba czastek, ktore spadly na ziemie: " << particlesOnEarth.size() << "\n";
     cout << "Liczba czastek, ktore opuscily atmosfere: " << particlesOverflow.size() << "\n";
-	cout << "Liczba czastek pozostalych w powietrzu: " << cloud->particles.size() << "\n";
-	cout << "Liczba czastek poza obszarem DEM: " << holdParticlesCount - particlesOnEarth.size() - cloud->particles.size() - particlesOverflow.size() << "\n";
-	cout << "Laczna liczba czastek: " << holdParticlesCount << "\n";
+    cout << "Liczba czastek pozostalych w powietrzu: " << cloud->particles.size() << "\n";
+    cout << "Laczna liczba czastek: " << holdParticlesCount << "\n";
+
     return 0;
 }
