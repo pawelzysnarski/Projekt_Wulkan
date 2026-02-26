@@ -19,7 +19,6 @@
 #include <streambuf>
 #include <GL/glut.h>
 
-
 #ifndef GL_PROGRAM_POINT_SIZE
 #define GL_PROGRAM_POINT_SIZE 0x8642
 #endif
@@ -62,7 +61,7 @@ int main(int argc, char** argv) {
     srand((unsigned)time(NULL));
 
     int volcanoChoice = 1;
-    int userParticleCount = 0;
+    int userParticleCount = 3000;
     float userZScale = 10.0f;
     float userTurbulence = 0.1f;
     float userWindSpeed = 2.0f;
@@ -258,19 +257,24 @@ int main(int argc, char** argv) {
 
     static int frameCounter = 0;
 
+    double lastKeyTime = 0.0;
+    double keyDelay = 0.25;
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
+        double currentTime = glfwGetTime();
+
         if (menuActive) {
-            if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+            if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS && (currentTime - lastKeyTime) > keyDelay) {
                 selectedMenuItem = (selectedMenuItem - 1 + menuItems) % menuItems;
-                glfwWaitEventsTimeout(0.2);
+                lastKeyTime = currentTime;
             }
-            if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+            if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS && (currentTime - lastKeyTime) > keyDelay) {
                 selectedMenuItem = (selectedMenuItem + 1) % menuItems;
-                glfwWaitEventsTimeout(0.2);
+                lastKeyTime = currentTime;
             }
-            if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+            if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS && (currentTime - lastKeyTime) > keyDelay) {
                 switch (selectedMenuItem) {
                 case 0:
                     volcanoChoice = (volcanoChoice == 1) ? 2 : 1;
@@ -288,9 +292,9 @@ int main(int argc, char** argv) {
                     userWindSpeed = max(0.0f, userWindSpeed - 0.5f);
                     break;
                 }
-                glfwWaitEventsTimeout(0.1);
+                lastKeyTime = currentTime;
             }
-            if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+            if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS && (currentTime - lastKeyTime) > keyDelay) {
                 switch (selectedMenuItem) {
                 case 0:
                     volcanoChoice = (volcanoChoice == 1) ? 2 : 1;
@@ -308,9 +312,9 @@ int main(int argc, char** argv) {
                     userWindSpeed = min(50.0f, userWindSpeed + 0.5f);
                     break;
                 }
-                glfwWaitEventsTimeout(0.1);
+                lastKeyTime = currentTime;
             }
-            if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS) {
+            if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS && (currentTime - lastKeyTime) > keyDelay) {
                 if (selectedMenuItem == 5) {
                     menuActive = false;
 
@@ -331,6 +335,7 @@ int main(int argc, char** argv) {
                     weatherSystem.wind_u = userWindSpeed * 0.8;
                     weatherSystem.wind_v = userWindSpeed * 0.6;
                 }
+                lastKeyTime = currentTime;
             }
         }
 
