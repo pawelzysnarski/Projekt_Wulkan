@@ -17,6 +17,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <streambuf>
+#include <GL/glut.h>
+
 
 #ifndef GL_PROGRAM_POINT_SIZE
 #define GL_PROGRAM_POINT_SIZE 0x8642
@@ -27,8 +29,50 @@ using namespace std;
 struct NullBuffer : streambuf { int overflow(int c) override { return c; } };
 void Wait(int milliseconds) { this_thread::sleep_for(chrono::milliseconds(milliseconds)); }
 
-int main() {
+void renderText(float x, float y, const char* text, void* font = GLUT_BITMAP_HELVETICA_18) {
+    glRasterPos2f(x, y);
+    for (const char* c = text; *c != '\0'; c++) {
+        glutBitmapCharacter(font, *c);
+    }
+}
+
+void drawRect(float x, float y, float width, float height, float r, float g, float b, float a) {
+    glColor4f(r, g, b, a);
+    glBegin(GL_QUADS);
+    glVertex2f(x, y);
+    glVertex2f(x + width, y);
+    glVertex2f(x + width, y + height);
+    glVertex2f(x, y + height);
+    glEnd();
+}
+
+void drawRectOutline(float x, float y, float width, float height, float r, float g, float b) {
+    glColor3f(r, g, b);
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(x, y);
+    glVertex2f(x + width, y);
+    glVertex2f(x + width, y + height);
+    glVertex2f(x, y + height);
+    glEnd();
+}
+
+int main(int argc, char** argv) {
+    glutInit(&argc, argv);
+
     srand((unsigned)time(NULL));
+
+    int volcanoChoice = 1;
+    int userParticleCount = 0;
+    float userZScale = 10.0f;
+    float userTurbulence = 0.1f;
+    float userWindSpeed = 2.0f;
+    float userCraterRadius = 30.0f;
+    float userMinSpeed = 40.0f;
+    float userMaxSpeed = 80.0f;
+
+    bool menuActive = true;
+    int selectedMenuItem = 0;
+    const int menuItems = 6;
 
     float angle = 0.0f;
     string heightPath = "../geo/vesuvius_dem_height.tif";
@@ -36,6 +80,28 @@ int main() {
     string weatherCSV = "../geo/open-meteo-40.81N14.44E1176m.csv";
     float orbitRadius = 8000.0f;
     Weather weatherSystem;
+
+    if (!glfwInit()) { cerr << "glfwInit failed\n"; return 1; }
+
+    int winW = 1400;
+    int winH = 900;
+
+    GLFWmonitor* mon = glfwGetPrimaryMonitor();
+    const GLFWvidmode* vm = glfwGetVideoMode(mon);
+    int maxW = (int)(vm->width * 0.9);
+    int maxH = (int)(vm->height * 0.9);
+
+    if (winW > maxW) winW = maxW;
+    if (winH > maxH) winH = maxH;
+
+    GLFWwindow* window = glfwCreateWindow(winW, winH, "Eruption Simulator - Dynamic Weather System", nullptr, nullptr);
+    if (!window) { cerr << "glfwCreateWindow failed\n"; glfwTerminate(); return 1; }
+    glfwMakeContextCurrent(window);
+    glfwSetInputMode(window, GLFW_STICKY_KEYS, GLFW_TRUE);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_PROGRAM_POINT_SIZE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     cout << "Ladowanie danych pogodowych z: " << weatherCSV << "\n";
     bool weatherLoaded = false;
@@ -54,7 +120,6 @@ int main() {
     }
 
     DEMLoader dem;
-
     if (!dem.loadHeight(heightPath)) {
         cerr << "Nie mozna wczytac pliku wysokosci: " << heightPath << "\n";
         return 1;
@@ -94,20 +159,19 @@ int main() {
     cout << "Krater X (metry): " << craterX << "\n";
     cout << "Krater Y (metry): " << craterY << "\n";
 
-
     vector<unsigned char> tex((size_t)nx * (size_t)ny * 4, 0);
 
     if (dem.hasColors()) {
         cout << "Tworzenie tekstury z kolorow...\n";
-        for (int y = 0; y < ny; ++y) {
-            for (int x = 0; x < nx; ++x) {
+        for (int y = 0; y < ny; y++) {
+            for (int x = 0; x < nx; x++) {
                 const DEMLoader::Color* col = dem.getColor(x, y);
                 if (col) {
-                    size_t idx = (size_t)(y * nx + x) * 4; 
+                    size_t idx = (size_t)(y * nx + x) * 4;
                     tex[idx] = col->r;
                     tex[idx + 1] = col->g;
                     tex[idx + 2] = col->b;
-                    tex[idx + 3] = 255;  
+                    tex[idx + 3] = 255;
                 }
             }
         }
@@ -118,8 +182,8 @@ int main() {
         double range = maxH - minH;
         if (range <= 0) range = 1.0;
 
-        for (int y = 0; y < ny; ++y) {
-            for (int x = 0; x < nx; ++x) {
+        for (int y = 0; y < ny; y++) {
+            for (int x = 0; x < nx; x++) {
                 double gx = minX + x * pxSizeX;
                 double gy = minY + y * pxSizeY_abs;
                 double z = dem.getGroundZ(gx, gy);
@@ -127,7 +191,7 @@ int main() {
                 if (!isnan(z)) {
                     val = (unsigned char)(((z - minH) / range) * 255.0);
                 }
-                size_t idx = (size_t)(y * nx + x) * 4; 
+                size_t idx = (size_t)(y * nx + x) * 4;
                 tex[idx] = val;
                 tex[idx + 1] = val;
                 tex[idx + 2] = val;
@@ -135,26 +199,6 @@ int main() {
             }
         }
     }
-
-    if (!glfwInit()) { cerr << "glfwInit failed\n"; return 1; }
-
-    int winW = 1200;
-    int winH = 800;
-
-    GLFWmonitor* mon = glfwGetPrimaryMonitor();
-    const GLFWvidmode* vm = glfwGetVideoMode(mon);
-    int maxW = (int)(vm->width * 0.9);
-    int maxH = (int)(vm->height * 0.9);
-
-    if (winW > maxW) winW = maxW;
-    if (winH > maxH) winH = maxH;
-
-    GLFWwindow* window = glfwCreateWindow(winW, winH, "Eruption Simulator - Dynamic Weather System", nullptr, nullptr);
-    if (!window) { cerr << "glfwCreateWindow failed\n"; glfwTerminate(); return 1; }
-    glfwMakeContextCurrent(window);
-    glfwSetInputMode(window, GLFW_STICKY_KEYS, GLFW_TRUE);
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_PROGRAM_POINT_SIZE);
 
     GLuint texId = 0;
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -168,8 +212,8 @@ int main() {
     glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
     double minElev = 1e15, maxElev = -1e15;
-    for (int y = 0; y < ny; ++y) {
-        for (int x = 0; x < nx; ++x) {
+    for (int y = 0; y < ny; y++) {
+        for (int x = 0; x < nx; x++) {
             double gx = minX + x * pxSizeX;
             double gy = minY + y * pxSizeY_abs;
             double z = dem.getGroundZ(gx, gy);
@@ -182,9 +226,7 @@ int main() {
     cout << "Zakres wysokosci: " << minElev << " - " << maxElev << " m\n";
     cout << "Wysokosc krateru: " << craterZRaw << " m\n";
 
-    double zScale = 10.0;
     double baseZ = minElev;
-
     float camHeightOverCrater = 4000.0f;
 
     weatherSystem.updateForAltitude(craterZRaw);
@@ -195,17 +237,6 @@ int main() {
     cout << "  Cisnienie: " << weatherSystem.pressure << " Pa\n";
     cout << "  Wilgotnosc: " << weatherSystem.humidity << "%\n";
     cout << "  Gestosc powietrza: " << weatherSystem.CalculateAirDensity() << " kg/m3\n";
-
-    int particleCount = rand() % 1000 + 2000;
-    int particlesPerFrame;
-    int holdParticlesCount = 0;
-    Cloud* cloud = new Cloud(&weatherSystem);
-    bool isActive = true;
-    vector<Materia> particlesOnEarth;
-    vector<Materia> particlesOverflow;
-
-    cout << "\nSymulacja rozpoczyna sie. Nacisnij ESC aby zakonczyc.\n";
-    cout << "Liczba czastek: " << particleCount << "\n";
 
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
@@ -219,13 +250,112 @@ int main() {
     glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
     glShadeModel(GL_SMOOTH);
 
+    int holdParticlesCount = 0;
+    Cloud* cloud = new Cloud(&weatherSystem);
+    bool isActive = true;
+    vector<Materia> particlesOnEarth;
+    vector<Materia> particlesOverflow;
+
     static int frameCounter = 0;
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
+
+        if (menuActive) {
+            if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
+                selectedMenuItem = (selectedMenuItem - 1 + menuItems) % menuItems;
+                glfwWaitEventsTimeout(0.2);
+            }
+            if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+                selectedMenuItem = (selectedMenuItem + 1) % menuItems;
+                glfwWaitEventsTimeout(0.2);
+            }
+            if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+                switch (selectedMenuItem) {
+                case 0:
+                    volcanoChoice = (volcanoChoice == 1) ? 2 : 1;
+                    break;
+                case 1:
+                    userParticleCount = max(0, userParticleCount - 500);
+                    break;
+                case 2:
+                    userZScale = max(1.0f, userZScale - 0.5f);
+                    break;
+                case 3:
+                    userTurbulence = max(0.0f, userTurbulence - 0.05f);
+                    break;
+                case 4:
+                    userWindSpeed = max(0.0f, userWindSpeed - 0.5f);
+                    break;
+                }
+                glfwWaitEventsTimeout(0.1);
+            }
+            if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+                switch (selectedMenuItem) {
+                case 0:
+                    volcanoChoice = (volcanoChoice == 1) ? 2 : 1;
+                    break;
+                case 1:
+                    userParticleCount = min(10000, userParticleCount + 500);
+                    break;
+                case 2:
+                    userZScale = min(50.0f, userZScale + 0.5f);
+                    break;
+                case 3:
+                    userTurbulence = min(2.0f, userTurbulence + 0.05f);
+                    break;
+                case 4:
+                    userWindSpeed = min(50.0f, userWindSpeed + 0.5f);
+                    break;
+                }
+                glfwWaitEventsTimeout(0.1);
+            }
+            if (glfwGetKey(window, GLFW_KEY_ENTER) == GLFW_PRESS) {
+                if (selectedMenuItem == 5) {
+                    menuActive = false;
+
+                    if (volcanoChoice != 1) {
+                        cout << "Wybrano wulkan numer " << volcanoChoice << ". Używam Vesuvius.\n";
+                    }
+
+                    int particleCount = (userParticleCount == 0) ? (rand() % 1000 + 2000) : userParticleCount;
+
+                    cout << "\nSymulacja rozpoczyna sie. Nacisnij ESC aby zakonczyc.\n";
+                    cout << "Parametry:\n";
+                    cout << "  Liczba czastek: " << particleCount << "\n";
+                    cout << "  Skala wysokosci: " << userZScale << "\n";
+                    cout << "  Turbulencja: " << userTurbulence << "\n";
+                    cout << "  Predkosc wiatru: " << userWindSpeed << " m/s\n";
+
+                    weatherSystem.turbulence = userTurbulence;
+                    weatherSystem.wind_u = userWindSpeed * 0.8;
+                    weatherSystem.wind_v = userWindSpeed * 0.6;
+                }
+            }
+        }
+
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
             glfwSetWindowShouldClose(window, GLFW_TRUE);
             break;
+        }
+
+        if (!menuActive) {
+            if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+                camHeightOverCrater += 500.0f;
+            if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+                camHeightOverCrater = max(500.0f, camHeightOverCrater - 500.0f);
+            if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+                angle -= 0.1f;
+            if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+                angle += 0.1f;
+            if (glfwGetKey(window, GLFW_KEY_KP_ADD) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_EQUAL) == GLFW_PRESS)
+                orbitRadius = max(2000.0f, orbitRadius - 500.0f);
+            if (glfwGetKey(window, GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_MINUS) == GLFW_PRESS)
+                orbitRadius += 500.0f;
+            if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS)
+                userZScale += 0.5f;
+            if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
+                userZScale = max(1.0f, userZScale - 0.5f);
         }
 
         int w, h; glfwGetFramebufferSize(window, &w, &h);
@@ -248,10 +378,10 @@ int main() {
         double orbitX = cos(angle) * orbitRadius;
         double orbitY = sin(angle) * orbitRadius;
 
-        float camZ = (float)((craterZRaw - baseZ) * zScale + camHeightOverCrater);
+        float camZ = (float)((craterZRaw - baseZ) * userZScale + camHeightOverCrater);
 
         glm::vec3 eye((float)(craterX + orbitX), (float)(craterY + orbitY), camZ);
-        glm::vec3 target((float)craterX, (float)craterY, (float)((craterZRaw - baseZ) * zScale));
+        glm::vec3 target((float)craterX, (float)craterY, (float)((craterZRaw - baseZ) * userZScale));
         glm::vec3 up(0.0f, 0.0f, 1.0f);
 
         glm::mat4 view = glm::lookAt(eye, target, up);
@@ -284,10 +414,10 @@ int main() {
                 if (isnan(z11r)) z11r = minElev;
                 if (isnan(z01r)) z01r = minElev;
 
-                double z00 = (z00r - baseZ) * zScale;
-                double z10 = (z10r - baseZ) * zScale;
-                double z11 = (z11r - baseZ) * zScale;
-                double z01 = (z01r - baseZ) * zScale;
+                double z00 = (z00r - baseZ) * userZScale;
+                double z10 = (z10r - baseZ) * userZScale;
+                double z11 = (z11r - baseZ) * userZScale;
+                double z01 = (z01r - baseZ) * userZScale;
 
                 float u0 = (float)x / (float)(nx - 1);
                 float u1 = (float)(x + 1) / (float)(nx - 1);
@@ -317,123 +447,148 @@ int main() {
         glPointSize(8.0f);
         glBegin(GL_POINTS);
         glColor3f(1.0f, 0.0f, 0.0f);
-        glVertex3f((float)craterX, (float)craterY, (float)((craterZRaw - baseZ) * zScale));
+        glVertex3f((float)craterX, (float)craterY, (float)((craterZRaw - baseZ) * userZScale));
         glEnd();
-        glEnable(GL_LIGHTING);
 
         for (const auto& p : particlesOnEarth) {
             glPointSize(4.0f);
             glBegin(GL_POINTS);
             glColor3f(0.0f, 0.0f, 0.0f);
-            float pz = (float)((p.position_z - baseZ) * zScale);
+            float pz = (float)((p.position_z - baseZ) * userZScale);
             glVertex3f((float)p.position_x, (float)p.position_y, pz);
             glEnd();
         }
 
-        if (isActive) {
-            particlesPerFrame = rand() % 30 + 10;
-            int particlesToAdd = min(particlesPerFrame, particleCount - holdParticlesCount);
-            if (particlesToAdd > 0) {
-                cloud->generateParticles(particlesToAdd, craterX, craterY, craterZRaw, 30.0, 40.0, 80.0, 0.0005, 0.002, rand() % 10);
-                holdParticlesCount += particlesToAdd;
-            }
-            else { isActive = false; }
-        }
-
         for (const auto& p : cloud->particles) {
-            glDisable(GL_LIGHTING);
             glPointSize(3.0f);
             glBegin(GL_POINTS);
             float heightFactor = (float)min(1.0, max(0.0, (p.position_z - craterZRaw + 500.0) / 1000.0));
             glColor3f(0.2f + heightFactor * 0.8f, 0.2f + heightFactor * 0.8f, 0.2f + heightFactor * 0.8f);
-            float pz = (float)((p.position_z - baseZ) * zScale);
+            float pz = (float)((p.position_z - baseZ) * userZScale);
             glVertex3f((float)p.position_x, (float)p.position_y, pz);
             glEnd();
-            glEnable(GL_LIGHTING);
         }
 
-        double wind_u, wind_v;
-        weatherSystem.GetWindVector(wind_u, wind_v);
-        double updraft = max(0.0, (weatherSystem.temperature - 15.0) * 0.2) * 100;
-        cloud->update(0.05, weatherSystem.CalculateAirDensity(), wind_u, wind_v, particlesOnEarth, particlesOverflow, dem, updraft, weatherSystem.turbulence * 0.5);
+        glEnable(GL_LIGHTING);
 
-        for (auto it = particlesOnEarth.begin(); it != particlesOnEarth.end();) {
-            bool out = (it->position_x < minX || it->position_x > maxX || it->position_y < minY || it->position_y > maxY);
-            double gz = dem.getGroundZ(it->position_x, it->position_y);
-            if (out || isnan(gz)) {
-                particlesOverflow.push_back(*it);
-                it = particlesOnEarth.erase(it);
-            }
-            else {
-                it->position_z = gz;
-                ++it;
-            }
-        }
+        if (!menuActive) {
+            int particleCount = (userParticleCount == 0) ? (rand() % 1000 + 2000) : userParticleCount;
+            int particlesPerFrame = rand() % 30 + 10;
 
-        if (frameCounter % 50 == 0) {
-            cout << "Frame " << frameCounter << ": ";
-            if (isActive) { cout << "Wulkan aktywny. Nowych czastek: " << particlesPerFrame << "\n"; }
-            else { cout << "Wulkan nieaktywny.\n"; }
-            cout << "W powietrzu: " << cloud->particles.size()
-                << ", Na ziemi: " << particlesOnEarth.size()
-                << ", Poza atmosfera: " << particlesOverflow.size()
-                << ", Ogolem: " << particleCount << endl;
-            double avgHeight = 0, minHeight = 1e9, maxHeight = -1e9; int validCount = 0;
-            for (auto& p : cloud->particles) {
-                if (!isnan(p.position_z) && p.position_z > 0 && p.position_z < 100000) {
-                    avgHeight += p.position_z; if (p.position_z < minHeight) minHeight = p.position_z; if (p.position_z > maxHeight) maxHeight = p.position_z; validCount++;
+            if (isActive && holdParticlesCount < particleCount) {
+                int particlesToAdd = min(particlesPerFrame, particleCount - holdParticlesCount);
+                if (particlesToAdd > 0) {
+                    cloud->generateParticles(particlesToAdd, craterX, craterY, craterZRaw,
+                        userCraterRadius, userMinSpeed, userMaxSpeed,
+                        0.0005, 0.002, rand() % 10);
+                    holdParticlesCount += particlesToAdd;
+                }
+                else { isActive = false; }
+            }
+
+            double wind_u = userWindSpeed * 0.8;
+            double wind_v = userWindSpeed * 0.6;
+            double updraft = max(0.0, (weatherSystem.temperature - 15.0) * 0.2) * 100;
+
+            cloud->update(0.05, weatherSystem.CalculateAirDensity(), wind_u, wind_v,
+                particlesOnEarth, particlesOverflow, dem, updraft, userTurbulence * 0.5);
+
+            for (auto it = particlesOnEarth.begin(); it != particlesOnEarth.end();) {
+                bool out = (it->position_x < minX || it->position_x > maxX ||
+                    it->position_y < minY || it->position_y > maxY);
+                double gz = dem.getGroundZ(it->position_x, it->position_y);
+                if (out || isnan(gz)) {
+                    particlesOverflow.push_back(*it);
+                    it = particlesOnEarth.erase(it);
+                }
+                else {
+                    it->position_z = gz;
+                    ++it;
                 }
             }
-            if (validCount > 0) { avgHeight /= validCount; }
-            cout << "Czastek w chmurze: " << cloud->particles.size()
-                << ", Srednia wysokosc: " << avgHeight << "m"
-                << ", Wiatr: (" << fixed << setprecision(2) << wind_u << ", " << wind_v << ") m/s"
-                << ", Temp: " << weatherSystem.temperature << "°C" << endl;
+
+            if (frameCounter % 50 == 0) {
+                cout << "Frame " << frameCounter << ": ";
+                cout << "W powietrzu: " << cloud->particles.size()
+                    << ", Na ziemi: " << particlesOnEarth.size()
+                    << ", Poza: " << particlesOverflow.size() << endl;
+            }
+            frameCounter++;
         }
-        frameCounter++;
 
-        // KAMERA - strzałki:
-// UP/DOWN   - zmiana wysokości kamery nad kraterem
-// LEFT/RIGHT - obrót wokół krateru 
+        if (menuActive) {
+            glMatrixMode(GL_PROJECTION);
+            glPushMatrix();
+            glLoadIdentity();
+            glOrtho(0, winW, winH, 0, -1, 1);
+            glMatrixMode(GL_MODELVIEW);
+            glPushMatrix();
+            glLoadIdentity();
 
-        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-            camHeightOverCrater += 500.0f;
+            glDisable(GL_LIGHTING);
+            glDisable(GL_DEPTH_TEST);
 
-        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-            camHeightOverCrater = max(500.0f, camHeightOverCrater - 500.0f);
+            drawRect(winW / 2 - 300, winH / 2 - 200, 600, 400, 0.1f, 0.1f, 0.1f, 0.9f);
+            drawRectOutline(winW / 2 - 300, winH / 2 - 200, 600, 400, 1.0f, 1.0f, 1.0f);
 
-        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
-            angle -= 0.1f;  
+            glColor3f(1.0f, 1.0f, 1.0f);
+            renderText(winW / 2 - 150, winH / 2 - 180, "ERUPTION SIMULATOR", GLUT_BITMAP_TIMES_ROMAN_24);
 
-        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-            angle += 0.1f; 
+            int yPos = winH / 2 - 120;
 
+            if (selectedMenuItem == 0) glColor3f(1.0f, 1.0f, 0.0f);
+            else glColor3f(1.0f, 1.0f, 1.0f);
+            string volcanoText = "Wulkan: " + string((volcanoChoice == 1) ? "Vesuvius" : "Inny (do implementacji)");
+            renderText(winW / 2 - 250, yPos, volcanoText.c_str());
 
-        // ODLEGŁOŚĆ OD KRATERU:
-        // KP_ADD / EQUAL   - przybliż (zmniejsz odległość)
-        // KP_SUBTRACT / MINUS - oddal (zwiększ odległość)
+            yPos += 30;
+            if (selectedMenuItem == 1) glColor3f(1.0f, 1.0f, 0.0f);
+            else glColor3f(1.0f, 1.0f, 1.0f);
+            string particlesText = "Liczba czastek: " + to_string(userParticleCount == 0 ? 3000 : userParticleCount);
+            renderText(winW / 2 - 250, yPos, particlesText.c_str());
 
-        if (glfwGetKey(window, GLFW_KEY_KP_ADD) == GLFW_PRESS ||
-            glfwGetKey(window, GLFW_KEY_EQUAL) == GLFW_PRESS)
-            orbitRadius = max(2000.0f, orbitRadius - 500.0f);  
+            yPos += 30;
+            if (selectedMenuItem == 2) glColor3f(1.0f, 1.0f, 0.0f);
+            else glColor3f(1.0f, 1.0f, 1.0f);
+            char zScaleText[50];
+            snprintf(zScaleText, sizeof(zScaleText), "Skala wysokosci: %.1f", userZScale);
+            renderText(winW / 2 - 250, yPos, zScaleText);
 
-        if(glfwGetKey(window, GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS ||
-            glfwGetKey(window, GLFW_KEY_MINUS) == GLFW_PRESS)
-            orbitRadius += 500.0f;  
+            yPos += 30;
+            if (selectedMenuItem == 3) glColor3f(1.0f, 1.0f, 0.0f);
+            else glColor3f(1.0f, 1.0f, 1.0f);
+            char turbText[50];
+            snprintf(turbText, sizeof(turbText), "Turbulencja: %.2f", userTurbulence);
+            renderText(winW / 2 - 250, yPos, turbText);
 
+            yPos += 30;
+            if (selectedMenuItem == 4) glColor3f(1.0f, 1.0f, 0.0f);
+            else glColor3f(1.0f, 1.0f, 1.0f);
+            char windText[50];
+            snprintf(windText, sizeof(windText), "Predkosc wiatru: %.1f m/s", userWindSpeed);
+            renderText(winW / 2 - 250, yPos, windText);
 
-        // SKALA WYSOKOŚCI (jak bardzo góra jest "szpiczasta"):
-        // Z - zwiększ skalę (góra bardziej stroma)
-        // X - zmniejsz skalę (góra bardziej płaska)
+            yPos += 50;
+            if (selectedMenuItem == 5) glColor3f(0.0f, 1.0f, 0.0f);
+            else glColor3f(1.0f, 1.0f, 1.0f);
+            renderText(winW / 2 - 100, yPos, "START SYMULACJI [ENTER]");
 
-        if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS)
-            zScale += 0.5;  
+            glColor3f(0.7f, 0.7f, 0.7f);
+            renderText(winW / 2 - 250, winH / 2 + 150, "STRZALKI GORA/DOL - nawigacja");
+            renderText(winW / 2 - 250, winH / 2 + 130, "STRZALKI LEWO/PRAWO - zmiana wartosci");
+            renderText(winW / 2 - 250, winH / 2 + 110, "ENTER - rozpocznij symulacje");
 
-        if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
-            zScale = max(1.0, zScale - 0.5); 
+            glEnable(GL_DEPTH_TEST);
+            glEnable(GL_LIGHTING);
+
+            glMatrixMode(GL_PROJECTION);
+            glPopMatrix();
+            glMatrixMode(GL_MODELVIEW);
+            glPopMatrix();
+        }
 
         glfwSwapBuffers(window);
-        Wait(100);
+        Wait(33);
     }
 
     if (texId) glDeleteTextures(1, &texId);
