@@ -127,12 +127,36 @@ void Cloud::update(double dt, double airDensity,
         p.position_x += p.vel_x * dt;
         p.position_y += p.vel_y * dt;
         p.position_z += p.vel_z * dt;
+
+        if (p.vel_z > 0&&p.position_z<=dem.getGroundZ(p.position_x,p.position_y)) {
+            double ground = dem.getGroundZ(p.position_x, p.position_y);
+            double hL = dem.getGroundZ(p.position_x - 1.0, p.position_y);
+            double hR = dem.getGroundZ(p.position_x + 1.0, p.position_y);
+            double hD = dem.getGroundZ(p.position_x, p.position_y - 1.0);
+            double hU = dem.getGroundZ(p.position_x, p.position_y + 1.0);
+            double nx = hL - hR;
+            double ny = hD - hU;
+            double nz = 2.0;
+            double len = sqrt(nx * nx + ny * ny + nz * nz);
+            if (len < 1e-9) len = 1.0;
+            nx /= len;
+            ny /= len;
+            nz /= len;
+            double dot = p.vel_x * nx + p.vel_y * ny + p.vel_z * nz;
+            p.vel_x = p.vel_x - 2.0 * dot * nx;
+            p.vel_y = p.vel_y - 2.0 * dot * ny;
+            p.vel_z = p.vel_z - 2.0 * dot * nz;
+            p.vel_x *= 0.55;
+            p.vel_y *= 0.55;
+            p.vel_z *= 0.55;
+            p.position_z = ground + 0.05;
+        }
     }
 
     auto it = remove_if(this->particles.begin(), this->particles.end(),
         [&](const Materia& p) {
             double ground = dem.getGroundZ(p.position_x, p.position_y);
-            if (p.position_z <= ground) {
+            if (p.position_z <= ground&&p.vel_z<=0) {
                 Materia g = p;
                 g.position_z = ground + 0.001;
                 vec.push_back(g);

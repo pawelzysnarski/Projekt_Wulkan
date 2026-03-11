@@ -65,7 +65,7 @@ int main(int argc, char** argv) {
 
     int volcanoChoice = 1;
     int userParticleCount = 3000;
-    float userZScale = 10.0f;
+    float userZScale = 4.0f;
     float userTurbulence = 0.1f;
     float userWindSpeed = 2.0f;
     float userCraterRadius = 30.0f;
@@ -256,7 +256,7 @@ int main(int argc, char** argv) {
     ImGuiIO& io = ImGui::GetIO(); 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
-
+	bool isPaused = false;
     ImGui::StyleColorsDark();
     int holdParticlesCount = 0;
     Cloud* cloud = new Cloud(&weatherSystem);
@@ -382,6 +382,12 @@ int main(int argc, char** argv) {
                 userZScale += 0.5f;
             if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS)
                 userZScale = max(1.0f, userZScale - 0.5f);
+            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS && !isPaused) {
+                isPaused = true;
+			}
+            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_RELEASE && isPaused) {
+                isPaused = false;
+            }
         }
 
         int w, h; glfwGetFramebufferSize(window, &w, &h);
@@ -499,7 +505,7 @@ int main(int argc, char** argv) {
 
         glEnable(GL_LIGHTING);
 
-        if (!menuActive) {
+        if (!menuActive&&!isPaused) {
             int particleCount = (userParticleCount == 0) ? (rand() % 1000 + 2000) : userParticleCount;
             int particlesPerFrame = rand() % 30 + 10;
 
@@ -518,7 +524,7 @@ int main(int argc, char** argv) {
             double wind_v = userWindSpeed * 0.6;
             double updraft = max(0.0, (weatherSystem.temperature - 15.0) * 0.2) * 100;
 
-            cloud->update(0.05, weatherSystem.CalculateAirDensity(), wind_u, wind_v,
+            cloud->update(0.01, weatherSystem.CalculateAirDensity(), wind_u, wind_v,
                 particlesOnEarth, particlesOverflow, dem, updraft, userTurbulence * 0.5);
 
             for (auto it = particlesOnEarth.begin(); it != particlesOnEarth.end();) {
@@ -632,13 +638,13 @@ int main(int argc, char** argv) {
     glfwDestroyWindow(window);
     glfwTerminate();
 
-    delete cloud;
+    
 
     cout << "\nSymulacja zakonczona.\n";
     cout << "Liczba czastek, ktore spadly na ziemie: " << particlesOnEarth.size() << "\n";
     cout << "Liczba czastek, ktore opuscily atmosfere: " << particlesOverflow.size() << "\n";
     cout << "Liczba czastek pozostalych w powietrzu: " << cloud->particles.size() << "\n";
     cout << "Laczna liczba czastek: " << holdParticlesCount << "\n";
-
+    delete cloud;
     return 0;
 }
